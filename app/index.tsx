@@ -1,13 +1,17 @@
-import { View, Text } from "react-native";
+import { Redirect } from "expo-router";
 
-export default function App() {
-  return (
-    <View className="flex-1 items-center justify-center bg-white">
-      <Text className="text-4xl font-bold text-black animate-pulse tracking-widest">
-        HSM APP
-      </Text>
+import { useAuthStore } from "@/src/store/authStore";
 
-      <Text className="mt-4 text-xs text-green-400">NativeWind Working!</Text>
-    </View>
-  );
+export default function Index() {
+  const { token, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (token) {
+    return <Redirect href="/(tabs)" />;
+  }
+
+  return <Redirect href="/(auth)/login" />;
 }
