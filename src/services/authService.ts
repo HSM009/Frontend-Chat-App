@@ -2,13 +2,13 @@ import { loginRequest } from "@/src/api/auth";
 
 import { useAuthStore } from "@/src/store/authStore";
 
-export async function loginUser(email: string, password: string) {
+export async function loginUser(phone: string, password: string) {
   const data = await loginRequest({
-    email,
+    phone,
     password,
   });
 
-  await useAuthStore.getState().login(data.user, data.token);
+  await useAuthStore.getState().login(data.user, data.accessToken);
 
   return data;
 }

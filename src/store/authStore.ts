@@ -4,7 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 type User = {
   id: string;
   name: string;
-  email: string;
+  phone: string;
 };
 
 type AuthState = {
@@ -29,14 +29,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: true,
 
   login: async (user, token) => {
-    await AsyncStorage.setItem("token", token);
+    try {
+      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("user", JSON.stringify(user));
 
-    await AsyncStorage.setItem("user", JSON.stringify(user));
-
-    set({
-      user,
-      token,
-    });
+      set({
+        user,
+        token,
+      });
+    } catch (error) {
+      console.error("Failed to save auth data:", error);
+    }
   },
 
   logout: async () => {
@@ -51,16 +54,23 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loadToken: async () => {
-    const token = await AsyncStorage.getItem("token");
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const user = await AsyncStorage.getItem("user");
 
-    const user = await AsyncStorage.getItem("user");
+      set({
+        token,
+        user: user ? JSON.parse(user) : null,
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error("Failed to load auth data:", error);
 
-    set({
-      token,
-
-      user: user ? JSON.parse(user) : null,
-
-      isLoading: false,
-    });
+      set({
+        token: null,
+        user: null,
+        isLoading: false,
+      });
+    }
   },
 }));

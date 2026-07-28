@@ -1,15 +1,21 @@
 import { Tabs } from "expo-router";
 
-import AuthGuard from "@/src/components/AuthGuard";
-
 export default function TabsLayout() {
   return (
-    <AuthGuard>
-      <Tabs>
-        <Tabs.Screen name="index" />
+    <Tabs screenOptions={{ headerShown: false }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Conversations",
+        }}
+      />
 
-        <Tabs.Screen name="profile" />
-      </Tabs>
-    </AuthGuard>
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+        }}
+      />
+    </Tabs>
   );
 }

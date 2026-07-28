@@ -1,17 +1,37 @@
-import { View, Text, Pressable, TextInput } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from "react-native";
 import { router } from "expo-router";
 import { useState } from "react";
 import { loginUser } from "@/src/services/authService";
 
 export default function Login() {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
   async function handleLogin() {
-    const result = await loginUser(email, password);
+    try {
+      setLoading(true);
+      const result = await loginUser(phone, password);
+      console.info("Signed In");
+      console.log(
+        "User name: ",
+        result.user.name,
+        ", User phone: ",
+        result.user.phone,
+      );
 
-    console.log(result);
-
-    router.replace("/(tabs)");
+      router.replace("/(tabs)");
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
   }
   return (
     <View className="flex-1 justify-center items-center bg-white">
@@ -20,31 +40,39 @@ export default function Login() {
       </Text>
 
       <TextInput
-        className="w-80 h-14 border border-gray-300 rounded-2xl px-5 text-gray-800 bg-gray-50 mb-4"
-        placeholder="Email"
+        className={`w-80 h-14 border border-gray-300 rounded-2xl px-5 text-gray-800 mb-2 ${
+          loading ? "bg-gray-200" : "bg-gray-50"
+        }`}
+        placeholder="Phone"
         placeholderTextColor="#9CA3AF"
-        value={email}
-        onChangeText={setEmail}
+        value={phone}
+        onChangeText={setPhone}
+        editable={!loading}
       />
 
       <TextInput
-        className="w-80 h-14 border border-gray-300 rounded-2xl px-5 text-gray-800 bg-gray-50 mb-2"
+        className={`w-80 h-14 border border-gray-300 rounded-2xl px-5 text-gray-800 mb-2 ${
+          loading ? "bg-gray-200" : "bg-gray-50"
+        }`}
         placeholder="Password"
         placeholderTextColor="#9CA3AF"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
+        editable={!loading}
       />
 
-      {/* Login Button */}
-
       <Pressable
+        disabled={loading}
         className="bg-yellow-500 px-10 py-3 rounded-xl mt-6"
         onPress={handleLogin}
       >
-        <Text className="font-bold">Login</Text>
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text className="font-bold text-white">Login</Text>
+        )}
       </Pressable>
-      {/* Register Button */}
 
       <Pressable
         className="mt-6"
