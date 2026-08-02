@@ -19,7 +19,7 @@ import { MessageNewPayload, MessageReadPayload } from "@/src/api/message";
 
 export default function Home() {
   const { data: conversations = [], isLoading, error } = useConversations();
-  console.log("Conversations:", JSON.stringify(conversations, null, 2));
+  // console.log("Conversations:", JSON.stringify(conversations, null, 2));
 
   function newConversationPressable() {
     router.push("/newConversation");

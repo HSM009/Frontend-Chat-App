@@ -1,16 +1,10 @@
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 import { useSendMessage } from "@/src/hooks/useSendMessage";
-import { Message, MessageType } from "../../api/message";
-import { useRef } from "react";
+import { Message, MessageType } from "@/src/api/message";
 import { socketService } from "@/src/services/socket";
+import { useAuthStore } from "@/src/store/authStore";
 
 type Props = {
   conversationId: string;
@@ -24,10 +18,14 @@ export default function MessageInput({
   onCancelReply,
 }: Props) {
   const [text, setText] = useState("");
+
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
 
-  const { mutateAsync, isPending } = useSendMessage();
+  const currentUser = useAuthStore((state) => state.user);
+
+  const { mutateAsync } = useSendMessage();
+
   function handleTyping(value: string) {
     setText(value);
 
@@ -35,7 +33,6 @@ export default function MessageInput({
 
     if (!isTyping.current) {
       isTyping.current = true;
-
       socketService.sendTyping(conversationId, true);
     }
 
@@ -45,29 +42,46 @@ export default function MessageInput({
 
     typingTimeout.current = setTimeout(() => {
       isTyping.current = false;
-
       socketService.sendTyping(conversationId, false);
     }, 1000);
   }
+
   async function handleSend() {
-    if (!text.trim()) return;
+    const messageText = text.trim();
+
+    if (!messageText) return;
+
+    // Clear input immediately
+    setText("");
+
+    // Remove reply preview immediately
+    const selectedReply = replyTo;
+    onCancelReply();
+
+    // Stop typing
+    if (typingTimeout.current) {
+      clearTimeout(typingTimeout.current);
+    }
+
+    isTyping.current = false;
+    socketService.sendTyping(conversationId, false);
 
     try {
       await mutateAsync({
         conversationId,
+        text: messageText,
         type: MessageType.TEXT,
-        text,
+        ...(selectedReply && {
+          replyToId: selectedReply.id,
+        }),
       });
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-      isTyping.current = false;
-      socketService.sendTyping(conversationId, false);
-      setText("");
     } catch (error) {
-      console.log(error);
+      console.log("Send message failed:", error);
+
+      // Later we can add failed message retry here
     }
   }
+
   useEffect(() => {
     return () => {
       if (typingTimeout.current) {
@@ -79,46 +93,43 @@ export default function MessageInput({
       }
     };
   }, [conversationId]);
+
   return (
     <View className="border-t border-gray-300 bg-white px-3 py-2">
-      <View className="flex-row items-center">
-        {replyTo && (
-          <View className="mx-3 mb-2 rounded-xl border-l-4 border-yellow-500 bg-gray-100 p-3">
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1">
-                <Text className="font-bold text-yellow-600">
-                  Replying to {replyTo.sender.name}
-                </Text>
+      {replyTo && (
+        <View className="mb-3 flex-row items-center rounded-xl border-l-4 border-yellow-500 bg-gray-100 px-3 py-2">
+          <View className="flex-1">
+            <Text className="text-xs font-bold text-yellow-600">
+              ↩ Replying to{" "}
+              {replyTo.sender.id === currentUser?.id
+                ? "You"
+                : replyTo.sender.name}
+            </Text>
 
-                <Text numberOfLines={1} className="mt-1 text-gray-600">
-                  {replyTo.text}
-                </Text>
-              </View>
-
-              <Pressable onPress={onCancelReply}>
-                <Text className="px-2 text-xl text-gray-500">✕</Text>
-              </Pressable>
-            </View>
+            <Text numberOfLines={1} className="mt-1 text-sm text-gray-700">
+              {replyTo.text ?? "Attachment"}
+            </Text>
           </View>
-        )}
+
+          <Pressable hitSlop={10} onPress={onCancelReply}>
+            <Text className="px-2 text-xl text-gray-500">✕</Text>
+          </Pressable>
+        </View>
+      )}
+
+      <View className="flex-row items-center">
         <TextInput
           className="flex-1 rounded-full border border-gray-300 px-4 py-3"
           placeholder="Type a message..."
           value={text}
-          editable={!isPending}
           onChangeText={handleTyping}
         />
 
         <Pressable
-          disabled={isPending}
           onPress={handleSend}
           className="ml-3 h-12 w-12 items-center justify-center rounded-full bg-yellow-500"
         >
-          {isPending ? (
-            <ActivityIndicator color="white" />
-          ) : (
-            <Text className="text-lg font-bold text-white">➤</Text>
-          )}
+          <Text className="text-lg font-bold text-white">➤</Text>
         </Pressable>
       </View>
     </View>

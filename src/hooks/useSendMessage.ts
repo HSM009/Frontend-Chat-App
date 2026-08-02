@@ -13,11 +13,13 @@ export function useSendMessage() {
       conversationId,
       text,
       type,
+      replyToId,
     }: {
       conversationId: string;
       text: string;
       type: MessageType;
-    }) => createMessage(conversationId, text, type),
+      replyToId?: string | null;
+    }) => createMessage(conversationId, text, type, replyToId),
 
     onMutate: async ({ conversationId, text, type }) => {
       if (!currentUser) {

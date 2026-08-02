@@ -14,10 +14,12 @@ export async function createMessage(
   conversationId: string,
   text: string,
   type: MessageType,
+  replyToId?: string | null,
 ): Promise<Message> {
   return await sendMessage(conversationId, {
     text,
     type,
+    ...(replyToId && { replyToId }),
   });
 }
 

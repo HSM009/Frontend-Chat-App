@@ -13,6 +13,7 @@ export interface Message {
   senderId: string;
   createdAt: string;
   type: string;
+
   sender: {
     id: string;
     name: string;
@@ -24,6 +25,11 @@ export interface Message {
   replyTo: {
     id: string;
     text: string | null;
+    deletedAt: string | null;
+    sender: {
+      id: string;
+      name: string;
+    };
   } | null;
   isDeleted: boolean;
 }
@@ -51,6 +57,7 @@ export enum MessageType {
 export interface SendMessageRequest {
   text: string;
   type: MessageType;
+  replyToId?: string | null;
 }
 
 export async function sendMessage(
@@ -58,6 +65,7 @@ export async function sendMessage(
   data: SendMessageRequest,
 ) {
   const response = await api.post(`/messages/${conversationId}/messages`, data);
+
   console.log("SEND RESPONSE:", response.data);
 
   return response.data;
