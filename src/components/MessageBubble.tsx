@@ -1,22 +1,27 @@
-import { View, Text } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { Message } from "@/src/api/message";
 
 type Props = {
   message: Message;
   isMine: boolean;
+  onReply?: () => void;
 };
 
-export default function MessageBubble({ message, isMine }: Props) {
+export default function MessageBubble({ message, isMine, onReply }: Props) {
   return (
-    <View className={`mb-3 ${isMine ? "items-end" : "items-start"}`}>
+    <Pressable
+      onLongPress={onReply}
+      delayLongPress={300}
+      className={`mb-3 ${isMine ? "items-end" : "items-start"}`}
+    >
       {!isMine && (
-        <Text className="mb-1 ml-2 text-xs text-gray-500">
-          {message.sender.name}
-        </Text>
+        <View className=" mb-1 ml-2`">
+          <Text className=" text-xs text-gray-500">{message.sender.name}A</Text>
+        </View>
       )}
 
       <View
-        className={`max-w-[80%] rounded-3xl px-4 py-3 ${
+        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
           isMine ? "bg-yellow-500" : "bg-gray-200"
         }`}
       >
@@ -35,6 +40,11 @@ export default function MessageBubble({ message, isMine }: Props) {
           })}
         </Text>
       </View>
-    </View>
+      {isMine && (
+        <Text className=" text-right text-xs text-gray-400">
+          {message.reads?.length > 0 ? "Seen" : "Sent"}
+        </Text>
+      )}
+    </Pressable>
   );
 }

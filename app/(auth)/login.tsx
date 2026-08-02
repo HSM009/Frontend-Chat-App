@@ -8,6 +8,7 @@ import {
 import { router } from "expo-router";
 import { useState } from "react";
 import { loginUser } from "@/src/services/authService";
+import { socketService } from "@/src/services/socket";
 
 export default function Login() {
   const [phone, setPhone] = useState("");
@@ -18,6 +19,7 @@ export default function Login() {
     try {
       setLoading(true);
       const result = await loginUser(phone, password);
+      socketService.connect(result.accessToken);
       console.info("Signed In");
       console.log(
         "User name: ",

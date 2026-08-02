@@ -1,7 +1,14 @@
 import { api } from "./client";
 
+export interface MessageNewPayload {
+  conversationId: string;
+  message: Message;
+  lastMessageAt: string;
+}
 export interface Message {
   id: string;
+  conversationId: string;
+
   text: string | null;
   senderId: string;
   createdAt: string;
@@ -34,8 +41,16 @@ export async function getMessages(conversationId: string) {
   return response.data;
 }
 
+export enum MessageType {
+  TEXT = "TEXT",
+  IMAGE = "IMAGE",
+  VIDEO = "VIDEO",
+  AUDIO = "AUDIO",
+  FILE = "FILE",
+}
 export interface SendMessageRequest {
   text: string;
+  type: MessageType;
 }
 
 export async function sendMessage(
@@ -43,5 +58,17 @@ export async function sendMessage(
   data: SendMessageRequest,
 ) {
   const response = await api.post(`/messages/${conversationId}/messages`, data);
+  console.log("SEND RESPONSE:", response.data);
+
   return response.data;
+}
+
+export interface MessageReadPayload {
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  readAt: string;
+}
+export async function markMessageAsRead(messageId: string) {
+  return api.post(`/messages/${messageId}/read`);
 }

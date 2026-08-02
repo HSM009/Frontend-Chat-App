@@ -2,6 +2,8 @@ import { useConversations } from "@/src/hooks/useConversation";
 import { useAuthStore } from "@/src/store/authStore";
 import { router } from "expo-router";
 import { Plus } from "lucide-react-native";
+import { useQueryClient } from "@tanstack/react-query";
+import { Conversation } from "@/src/types/conversation";
 
 import {
   ActivityIndicator,
@@ -10,14 +12,90 @@ import {
   Text,
   View,
 } from "react-native";
+import { useEffect } from "react";
+import { socketService } from "@/src/services/socket";
+import { WebSocketEvents } from "@/src/types/webSocketEvent";
+import { MessageNewPayload, MessageReadPayload } from "@/src/api/message";
 
 export default function Home() {
   const { data: conversations = [], isLoading, error } = useConversations();
+  console.log("Conversations:", JSON.stringify(conversations, null, 2));
+
   function newConversationPressable() {
     router.push("/newConversation");
   }
 
   const currentUser = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    function handleReadReceipt(payload: MessageReadPayload) {
+      queryClient.setQueryData(
+        ["conversations"],
+        (old: Conversation[] = []) => {
+          return old.map((conversation) => {
+            if (conversation.id !== payload.conversationId) {
+              return conversation;
+            }
+
+            return {
+              ...conversation,
+              unreadCount: 0,
+            };
+          });
+        },
+      );
+    }
+
+    socketService.subscribe<MessageReadPayload>(
+      WebSocketEvents.READ_RECEIPT,
+      handleReadReceipt,
+    );
+
+    return () => {
+      socketService.unsubscribe<MessageReadPayload>(
+        WebSocketEvents.READ_RECEIPT,
+        handleReadReceipt,
+      );
+    };
+  }, [queryClient]);
+  useEffect(() => {
+    function handleMessage(payload: MessageNewPayload) {
+      console.log("MESSAGE_NEW:", JSON.stringify(payload, null, 2));
+
+      queryClient.setQueryData(
+        ["conversations"],
+        (old: Conversation[] = []) => {
+          return old
+            .map((conversation) => {
+              if (conversation.id !== payload.conversationId) {
+                return conversation;
+              }
+
+              return {
+                ...conversation,
+                message: payload.message,
+                lastMessageAt: payload.lastMessageAt,
+              };
+            })
+            .sort(
+              (a, b) =>
+                new Date(b.lastMessageAt).getTime() -
+                new Date(a.lastMessageAt).getTime(),
+            );
+        },
+      );
+    }
+    socketService.subscribe<MessageNewPayload>(
+      WebSocketEvents.MESSAGE_NEW,
+      handleMessage,
+    );
+    return () => {
+      socketService.unsubscribe<MessageNewPayload>(
+        WebSocketEvents.MESSAGE_NEW,
+        handleMessage,
+      );
+    };
+  }, [queryClient]);
 
   if (isLoading) {
     return (
@@ -100,6 +178,7 @@ export default function Home() {
                     title,
                     avatar,
                     online: otherUser?.isOnline ? "1" : "0",
+                    userId: otherUser?.id,
                   },
                 })
               }
@@ -116,12 +195,10 @@ export default function Home() {
                   </Text>
 
                   <Text className="mt-1 text-gray-500" numberOfLines={1}>
-                    {item.message?.text ?? "No messages yet"}
+                    {item.lastMessage?.text ?? "No messages yet"}
                   </Text>
                 </View>
               </View>
-
-              {/* Right */}
 
               <View className="items-end">
                 {!item.isGroup && (

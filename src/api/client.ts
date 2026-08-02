@@ -2,8 +2,10 @@ import axios from "axios";
 
 import { useAuthStore } from "@/src/store/authStore";
 
+const url = process.env.EXPO_PUBLIC_BACKENDURL;
+
 export const api = axios.create({
-  baseURL: "http://172.20.10.5:3000/",
+  baseURL: url,
 });
 
 api.interceptors.request.use(async (config) => {

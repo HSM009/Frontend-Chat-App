@@ -6,7 +6,9 @@ export type Conversation = {
 
   unreadCount: number;
 
-  message: {
+  lastMessageAt: string;
+
+  lastMessage: {
     id: string;
     text: string;
     createdAt: string;
