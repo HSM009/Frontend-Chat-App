@@ -6,9 +6,16 @@ type Props = {
   subtitle?: string;
   avatar?: string;
   onBack: () => void;
+  onVoiceCall: () => void;
 };
 
-export default function ChatHeader({ title, subtitle, avatar, onBack }: Props) {
+export default function ChatHeader({
+  title,
+  subtitle,
+  avatar,
+  onBack,
+  onVoiceCall,
+}: Props) {
   return (
     <View className="mt-14 flex-row items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
       <View className="flex-row items-center flex-1">
@@ -34,15 +41,15 @@ export default function ChatHeader({ title, subtitle, avatar, onBack }: Props) {
       </View>
 
       <View className="flex-row items-center">
-        <Pressable className="p-2">
+        <Pressable className="p-2" onPress={onVoiceCall}>
           <Phone size={22} color="black" />
         </Pressable>
 
-        <Pressable className="ml-2 p-2">
+        <Pressable className="mr-4 p-2">
           <Video size={22} color="black" />
         </Pressable>
 
-        <Pressable className="ml-2 p-2">
+        <Pressable className="mr-4 p-2">
           <EllipsisVertical size={22} color="black" />
         </Pressable>
       </View>

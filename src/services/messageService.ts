@@ -1,5 +1,6 @@
 import {
   getMessages,
+  markMessageAsDelivered,
   markMessageAsRead,
   Message,
   MessageType,
@@ -25,4 +26,22 @@ export async function createMessage(
 
 export async function readMessage(messageId: string) {
   return markMessageAsRead(messageId);
+}
+
+export async function deliverMessage(messageId: string) {
+  return markMessageAsDelivered(messageId);
+}
+
+import { deleteMessage } from "@/src/api/message";
+
+export async function removeMessage(messageId: string) {
+  return deleteMessage(messageId);
+}
+
+import { updateMessage as updateMessageApi } from "@/src/api/message";
+
+export async function editMessage(messageId: string, text: string) {
+  return updateMessageApi(messageId, {
+    text,
+  });
 }

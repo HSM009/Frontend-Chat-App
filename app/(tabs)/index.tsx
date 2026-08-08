@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { Plus } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Conversation } from "@/src/types/conversation";
+import { deliverMessage } from "@/src/services/messageService";
 
 import {
   ActivityIndicator,
@@ -15,7 +16,11 @@ import {
 import { useEffect } from "react";
 import { socketService } from "@/src/services/socket";
 import { WebSocketEvents } from "@/src/types/webSocketEvent";
-import { MessageNewPayload, MessageReadPayload } from "@/src/api/message";
+import {
+  MessageDeletedPayload,
+  MessageNewPayload,
+  MessageReadPayload,
+} from "@/src/api/message";
 
 export default function Home() {
   const { data: conversations = [], isLoading, error } = useConversations();
@@ -58,6 +63,7 @@ export default function Home() {
       );
     };
   }, [queryClient]);
+
   useEffect(() => {
     function handleMessage(payload: MessageNewPayload) {
       console.log("MESSAGE_NEW:", JSON.stringify(payload, null, 2));
@@ -73,7 +79,7 @@ export default function Home() {
 
               return {
                 ...conversation,
-                message: payload.message,
+                lastMessage: payload.message,
                 lastMessageAt: payload.lastMessageAt,
               };
             })
@@ -84,6 +90,12 @@ export default function Home() {
             );
         },
       );
+
+      if (payload.message.senderId === currentUser?.id) {
+        return;
+      }
+
+      deliverMessage(payload.message.id).catch(console.error);
     }
     socketService.subscribe<MessageNewPayload>(
       WebSocketEvents.MESSAGE_NEW,
@@ -96,7 +108,47 @@ export default function Home() {
       );
     };
   }, [queryClient]);
+  useEffect(() => {
+    function handleMessageDeleted(payload: MessageDeletedPayload) {
+      queryClient.setQueryData(
+        ["conversations"],
+        (old: Conversation[] = []) => {
+          return old.map((conversation) => {
+            if (conversation.id !== payload.conversationId) {
+              return conversation;
+            }
 
+            // Only update if the deleted message is the current last message
+            if (conversation.lastMessage?.id !== payload.messageId) {
+              return conversation;
+            }
+
+            return {
+              ...conversation,
+
+              lastMessage: {
+                ...conversation.lastMessage,
+                text: null,
+                isDeleted: true,
+              },
+            };
+          });
+        },
+      );
+    }
+
+    socketService.subscribe<MessageDeletedPayload>(
+      WebSocketEvents.MESSAGE_DELETED,
+      handleMessageDeleted,
+    );
+
+    return () => {
+      socketService.unsubscribe<MessageDeletedPayload>(
+        WebSocketEvents.MESSAGE_DELETED,
+        handleMessageDeleted,
+      );
+    };
+  }, [queryClient]);
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center">

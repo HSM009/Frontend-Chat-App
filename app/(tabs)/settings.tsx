@@ -8,7 +8,6 @@ export default function SettingsScreen() {
   async function handleLogout() {
     try {
       await logout();
-      console.info("Logged out");
       router.replace("/(auth)/login");
     } catch (error) {
       console.log(error);

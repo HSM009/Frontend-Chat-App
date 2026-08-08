@@ -14,7 +14,6 @@ export default function Register() {
     try {
       setLoading(true);
       const result = await registerUser(name, phone, password);
-      console.log(result);
       router.replace("/(auth)/login");
     } catch (error) {
       console.log(error);

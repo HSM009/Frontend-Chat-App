@@ -1,5 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
-
 import { useLocalSearchParams, router } from "expo-router";
 import {
   ActivityIndicator,
@@ -10,22 +8,29 @@ import {
   View,
 } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { socketService } from "@/src/services/socket";
-import { WebSocketEvents } from "@/src/types/webSocketEvent";
+import MessageActionBar from "@/src/components/chat/MessageActionBar";
 import { useMessages } from "@/src/hooks/useMessage";
 import { useAuthStore } from "@/src/store/authStore";
+import { Keyboard } from "react-native";
 
 import ChatHeader from "@/src/components/chat/ChatHeader";
-import MessageBubble from "@/src/components/MessageBubble";
+import MessageBubble from "@/src/components/chat/MessageBubble";
 import MessageInput from "@/src/components/chat/MessageInput";
-import {
-  Message,
-  MessageNewPayload,
-  MessageReadPayload,
-} from "@/src/api/message";
+import { Message } from "@/src/api/message";
 import { useReadMessage } from "@/src/hooks/useReadMessage";
+import { useDeleteMessage } from "@/src/hooks/useDeleteMessage";
+import { useConversationSocket } from "@/src/hooks/useConversationSocket";
+import ReactionPicker from "@/src/components/chat/ReactionPicker";
+import { useReactToMessage } from "@/src/hooks/useReactToMessage";
+import IncomingCallModal from "@/src/components/call/IncomingCallModal";
+import OutgoingCallModal from "@/src/components/call/OutgoingCallModal";
+import { useCreateCall } from "@/src/hooks/useCall";
+import { useCallStore } from "@/src/store/callStore";
 
 export default function ConversationScreen() {
+  const { outgoingCall, clearOutgoingCall } = useCallStore();
+  const { incomingCall, clearIncomingCall } = useCallStore();
+
   const { conversationId, title, avatar, online, userId } =
     useLocalSearchParams<{
       conversationId: string;
@@ -34,177 +39,75 @@ export default function ConversationScreen() {
       online: string;
       userId: string;
     }>();
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
+  const [showReactionPicker, setShowReactionPicker] = useState(false);
   const currentUser = useAuthStore((state) => state.user);
+  const [selectedMessages, setSelectedMessages] = useState<Message[]>([]);
+  const selectedMessage = selectedMessages[0] ?? null;
+  const selectionCount = selectedMessages.length;
+  const flatListRef = useRef<FlatList<Message>>(null);
+
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const readMutation = useReadMessage();
-  const queryClient = useQueryClient();
-  const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reactMutation = useReactToMessage();
   const { data, isLoading, error } = useMessages(conversationId);
-  const [isOnline, setIsOnline] = useState(online === "true" || online === "1");
   const messages = data?.messages ?? [];
+  const deleteMutation = useDeleteMessage();
+
+  const toggleMessageSelection = (message: Message) => {
+    setSelectedMessages((previous) => {
+      const exists = previous.some((m) => m.id === message.id);
+
+      if (exists) {
+        return previous.filter((m) => m.id !== message.id);
+      }
+
+      return [...previous, message];
+    });
+  };
+  const [reactionPosition, setReactionPosition] = useState({
+    x: 0,
+    y: 0,
+  });
+  const clearSelection = () => {
+    setSelectedMessages([]);
+    setShowReactionPicker(false);
+  };
   useEffect(() => {
+    if (!messages.length) return;
+
     messages.forEach((message) => {
       if (message.senderId !== currentUser?.id && message.reads.length === 0) {
         readMutation.mutate(message.id);
       }
     });
-  }, [messages]);
+  }, [messages, currentUser?.id]);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({
+        offset: 0,
+        animated: true,
+      });
+    });
+  }, [messages.length]);
+
+  const { isTyping, isOnline } = useConversationSocket({
+    conversationId,
+    currentUserId: currentUser?.id ?? "",
+    userId: userId,
+  });
+  const createCallMutation = useCreateCall();
+
   const subtitle = isTyping ? "Typing..." : isOnline ? "Online" : "Offline";
-
   useEffect(() => {
-    function handleOnline(payload: { userId: string }) {
-      if (payload.userId !== userId) return;
+    const show = Keyboard.addListener("keyboardDidShow", () => {
+      clearSelection();
+    });
 
-      setIsOnline(true);
-    }
+    return () => show.remove();
+  }, []);
 
-    socketService.subscribe(
-      WebSocketEvents.USER_ONLINE,
-      handleOnline as (payload: unknown) => void,
-    );
-
-    return () => {
-      socketService.unsubscribe(
-        WebSocketEvents.USER_ONLINE,
-        handleOnline as (payload: unknown) => void,
-      );
-    };
-  }, [userId]);
-  useEffect(() => {
-    function handleOffline(payload: { userId: string }) {
-      if (payload.userId !== userId) return;
-
-      setIsOnline(false);
-    }
-
-    socketService.subscribe(
-      WebSocketEvents.USER_OFFLINE,
-      handleOffline as (payload: unknown) => void,
-    );
-
-    return () => {
-      socketService.unsubscribe(
-        WebSocketEvents.USER_OFFLINE,
-        handleOffline as (payload: unknown) => void,
-      );
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    function handleTyping(payload: {
-      conversationId: string;
-      userId: string;
-      typing: boolean;
-    }) {
-      if (payload.conversationId !== conversationId) return;
-
-      if (payload.userId !== userId) return;
-
-      if (payload.typing) {
-        setIsTyping(true);
-
-        if (typingTimeout.current) {
-          clearTimeout(typingTimeout.current);
-        }
-
-        typingTimeout.current = setTimeout(() => {
-          setIsTyping(false);
-        }, 2000);
-      }
-    }
-
-    socketService.subscribe(WebSocketEvents.USER_TYPING, handleTyping);
-
-    return () => {
-      socketService.unsubscribe(WebSocketEvents.USER_TYPING, handleTyping);
-      if (typingTimeout.current) {
-        clearTimeout(typingTimeout.current);
-      }
-    };
-  }, [conversationId, userId]);
-
-  useEffect(() => {
-    function handleMessage(payload: MessageNewPayload) {
-      if (payload.conversationId !== conversationId) {
-        return;
-      }
-
-      queryClient.setQueryData(["messages", conversationId], (old: any) => {
-        if (!old) return old;
-
-        const exists = old.messages.some(
-          (message: Message) => message.id === payload.message.id,
-        );
-
-        if (exists) {
-          return old;
-        }
-
-        return {
-          ...old,
-          messages: [payload.message, ...old.messages],
-        };
-      });
-      if (
-        payload.message.senderId !== currentUser?.id &&
-        payload.message.reads.length === 0
-      ) {
-        readMutation.mutate(payload.message.id);
-      }
-    }
-
-    socketService.subscribe<MessageNewPayload>(
-      WebSocketEvents.MESSAGE_NEW,
-      handleMessage,
-    );
-
-    return () => {
-      socketService.unsubscribe<MessageNewPayload>(
-        WebSocketEvents.MESSAGE_NEW,
-        handleMessage,
-      );
-    };
-  }, [conversationId, queryClient, currentUser?.id]);
-  useEffect(() => {
-    function handleReadReceipt(payload: MessageReadPayload) {
-      queryClient.setQueryData(["messages", conversationId], (old: any) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          messages: old.messages.map((message: Message) => {
-            if (message.id !== payload.messageId) {
-              return message;
-            }
-
-            return {
-              ...message,
-              reads: [
-                ...message.reads,
-                {
-                  userId: payload.userId,
-                  readAt: payload.readAt,
-                },
-              ],
-            };
-          }),
-        };
-      });
-    }
-
-    socketService.subscribe<MessageReadPayload>(
-      WebSocketEvents.READ_RECEIPT,
-      handleReadReceipt,
-    );
-
-    return () => {
-      socketService.unsubscribe<MessageReadPayload>(
-        WebSocketEvents.READ_RECEIPT,
-        handleReadReceipt,
-      );
-    };
-  }, [conversationId, queryClient]);
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -227,21 +130,100 @@ export default function ConversationScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
+      <IncomingCallModal
+        visible={!!incomingCall}
+        call={incomingCall}
+        onClose={clearIncomingCall}
+      />
+
+      <OutgoingCallModal
+        visible={!!outgoingCall}
+        call={outgoingCall?.call ?? null}
+        onClose={clearOutgoingCall}
+      />
       <View className="mx-4 mt-20">
         <ChatHeader
           title={title}
-          subtitle={isTyping ? "Typing..." : subtitle}
+          subtitle={subtitle}
           avatar={avatar}
-          onBack={() => router.back()}
+          onBack={() => {
+            clearSelection();
+            router.back();
+          }}
+          onVoiceCall={() => {
+            if (!conversationId || !userId) return;
+
+            createCallMutation.mutate(
+              {
+                conversationId,
+                receiverId: userId,
+              },
+              {
+                onSuccess: (data) => {
+                  useCallStore
+                    .getState()
+                    .startOutgoingCall(data.call, data.receiver);
+                },
+              },
+            );
+          }}
         />
       </View>
+      {selectionCount > 0 && (
+        <MessageActionBar
+          selectedMessages={selectedMessages}
+          currentUserId={currentUser?.id || "UNKNOWN"}
+          onClear={clearSelection}
+          onReply={(message) => {
+            setEditingMessage(null);
+            setReplyTo(message);
+          }}
+          onEdit={(message) => {
+            setReplyTo(null);
+            setEditingMessage(message);
+          }}
+          onDelete={async () => {
+            await Promise.all(
+              selectedMessages.map((message) =>
+                deleteMutation.mutateAsync(message.id),
+              ),
+            );
+          }}
+          onForward={() => {
+            // Forward screen later
+          }}
+          // onReaction={() => {
+          //   // Open reaction picker later
+          // }}
+        />
+      )}
+      {selectionCount == 1 && (
+        <ReactionPicker
+          visible={showReactionPicker}
+          // x={reactionPosition.x}
+          y={reactionPosition.y + 120}
+          onSelect={(emoji) => {
+            if (!selectedMessage) return;
 
+            reactMutation.mutate({
+              messageId: selectedMessage.id,
+              emoji,
+            });
+            setShowReactionPicker(false);
+            clearSelection();
+          }}
+        />
+      )}
       <FlatList
+        ref={flatListRef}
         data={messages}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(message) => message.id}
         contentContainerStyle={{
           padding: 16,
           flexGrow: 1,
+        }}
+        onScrollBeginDrag={() => {
+          setShowReactionPicker(false);
         }}
         ListEmptyComponent={() => (
           <View className="flex-1 items-center justify-center">
@@ -253,7 +235,23 @@ export default function ConversationScreen() {
           <MessageBubble
             message={item}
             isMine={item.senderId === currentUser?.id}
-            onReply={() => setReplyTo(item)}
+            selected={selectedMessages.some((m) => m.id === item.id)}
+            selectionMode={selectionCount > 0}
+            onSelect={() => toggleMessageSelection(item)}
+            onShowReactionPicker={(message, position) => {
+              setSelectedMessages([message]);
+              setReactionPosition(position);
+              setShowReactionPicker(true);
+            }}
+            // onReply={() => {
+            //   if (selectedMessages.length === 0) {
+            //     setReplyTo(item);
+            //   }
+            // }}
+            // onClose={() => {
+            //   setShowReactionPicker(false);
+            //   clearSelection();
+            // }}
           />
         )}
       />
@@ -261,7 +259,9 @@ export default function ConversationScreen() {
         <MessageInput
           conversationId={conversationId}
           replyTo={replyTo}
+          editingMessage={editingMessage}
           onCancelReply={() => setReplyTo(null)}
+          onCancelEdit={() => setEditingMessage(null)}
         />
       </View>
     </KeyboardAvoidingView>

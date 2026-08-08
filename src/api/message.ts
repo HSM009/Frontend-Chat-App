@@ -12,8 +12,10 @@ export interface Message {
   text: string | null;
   senderId: string;
   createdAt: string;
+  editedAt: string | null;
+  deletedAt: string | null;
   type: string;
-
+  optimistic?: boolean;
   sender: {
     id: string;
     name: string;
@@ -21,6 +23,18 @@ export interface Message {
   reads: {
     userId: string;
     readAt: string;
+  }[];
+  reactions: {
+    userId: string;
+    emoji: string;
+    user?: {
+      id: string;
+      name: string;
+    };
+  }[];
+  deliveries: {
+    userId: string;
+    deliveredAt: string;
   }[];
   replyTo: {
     id: string;
@@ -65,9 +79,6 @@ export async function sendMessage(
   data: SendMessageRequest,
 ) {
   const response = await api.post(`/messages/${conversationId}/messages`, data);
-
-  console.log("SEND RESPONSE:", response.data);
-
   return response.data;
 }
 
@@ -80,3 +91,51 @@ export interface MessageReadPayload {
 export async function markMessageAsRead(messageId: string) {
   return api.post(`/messages/${messageId}/read`);
 }
+
+export async function markMessageAsDelivered(messageId: string) {
+  return api.post(`/messages/${messageId}/delivered`);
+}
+
+export interface MessageDeliveredPayload {
+  messageId: string;
+  userId: string;
+}
+
+export interface MessageReactionPayload {
+  messageId: string;
+  userId: string;
+  emoji: string;
+  removed: boolean;
+}
+
+export interface MessageDeletedPayload {
+  conversationId: string;
+  messageId: string;
+  deletedAt: string;
+  deletedBy: string;
+}
+
+export async function deleteMessage(messageId: string) {
+  const response = await api.delete(`/messages/${messageId}`);
+
+  return response.data;
+}
+
+export interface UpdateMessageRequest {
+  text: string;
+}
+
+export interface UpdateMessageRequest {
+  text: string;
+}
+
+export async function updateMessage(
+  messageId: string,
+  data: UpdateMessageRequest,
+) {
+  const response = await api.patch(`/messages/${messageId}`, data);
+
+  return response.data;
+}
+
+export interface MessageUpdatedPayload extends Message {}
