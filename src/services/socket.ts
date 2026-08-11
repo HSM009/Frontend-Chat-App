@@ -4,6 +4,7 @@ class SocketService {
   private socket: WebSocket | null = null;
 
   private listeners = new Map<string, Set<EventHandler>>();
+  private manualDisconnect = false;
 
   connect(token: string) {
     console.log("Socket connect called");
@@ -13,30 +14,66 @@ class SocketService {
       (this.socket.readyState === WebSocket.OPEN ||
         this.socket.readyState === WebSocket.CONNECTING)
     ) {
+      console.log("Socket already connected/connecting");
       return;
     }
-    console.log("Creating websocket...");
-    const wsBackendUrl = process.env.EXPO_PUBLIC_WS_BACKENDURL;
+
+    const urls = [
+      process.env.EXPO_PUBLIC_WS_BACKENDURL,
+      process.env.EXPO_PUBLIC_WS_BACKENDURL2,
+    ].filter(Boolean) as string[];
+
+    this.connectWithFallback(urls, token, 0);
+  }
+
+  private connectWithFallback(urls: string[], token: string, index: number) {
+    if (index >= urls.length) {
+      console.info("❌ All WebSocket URLs failed");
+      return;
+    }
+
+    const wsBackendUrl = urls[index];
+
     const wsSocket = `${wsBackendUrl}ws?token=${token}`;
-    this.socket = new WebSocket(wsSocket);
-    this.socket.onopen = () => {
-      console.info("✅ WebSocket connected");
+
+    console.info(`🔌 Trying WebSocket ${index + 1}/${urls.length}:`, wsSocket);
+
+    const socket = new WebSocket(wsSocket);
+
+    this.socket = socket;
+
+    socket.onopen = () => {
+      console.info("✅ WebSocket connected:", wsBackendUrl);
     };
 
-    this.socket.onclose = () => {
-      console.warn("❌ WebSocket disconnected");
+    socket.onclose = (event) => {
+      if (!this.manualDisconnect) {
+        this.connectWithFallback(urls, token, index + 1);
+      }
+      console.warn(
+        "❌ WebSocket disconnected:",
+        wsBackendUrl,
+        event.code,
+        event.reason,
+      );
 
       this.socket = null;
-      //   setTimeout(() => {
-      //     this.connect(savedToken);
-      //   }, 3000);
+
+      // If connection never opened, try next URL
+      if (event.code !== 1000) {
+        console.info("🔄 Trying next WebSocket URL...");
+
+        this.connectWithFallback(urls, token, index + 1);
+      }
     };
 
-    this.socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
+    socket.onerror = (error) => {
+      console.info("❌ WebSocket error:", wsBackendUrl, error);
+
+      socket.close();
     };
 
-    this.socket.onmessage = (event) => {
+    socket.onmessage = (event) => {
       console.log("RAW WS:", event.data);
 
       try {
@@ -54,16 +91,16 @@ class SocketService {
 
         handlers.forEach((handler) => handler(data.payload));
       } catch (error) {
-        console.error(error);
+        console.info("WS parse error:", error);
       }
     };
   }
 
   disconnect() {
+    this.manualDisconnect = true;
     this.socket?.close();
 
     this.socket = null;
-
     this.listeners.clear();
   }
 
