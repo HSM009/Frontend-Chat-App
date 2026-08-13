@@ -60,8 +60,6 @@ export default function MessageInput({
     setText("");
 
     try {
-      console.log("Before edit");
-
       if (editingMessage) {
         const messageId = editingMessage.id;
 
@@ -169,6 +167,7 @@ export default function MessageInput({
           placeholder={editingMessage ? "Edit message..." : "Type a message..."}
           value={text}
           onChangeText={handleTyping}
+          multiline
         />
 
         <Pressable

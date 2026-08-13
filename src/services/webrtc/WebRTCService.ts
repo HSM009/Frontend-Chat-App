@@ -8,6 +8,10 @@ import {
   RTCSessionDescription,
 } from "react-native-webrtc";
 
+console.log("WebRTC native module loaded");
+console.log("mediaDevices:", !!mediaDevices);
+console.log("RTCPeerConnection:", !!RTCPeerConnection);
+
 type SignalCallback = (data: any) => void;
 type StreamCallback = (stream: MediaStream) => void;
 

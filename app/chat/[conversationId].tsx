@@ -28,9 +28,8 @@ import { useCreateCall } from "@/src/hooks/useCall";
 import { useCallStore } from "@/src/store/callStore";
 
 export default function ConversationScreen() {
-  const { outgoingCall, clearOutgoingCall } = useCallStore();
-  const { incomingCall, clearIncomingCall } = useCallStore();
-
+  const { outgoingCall, clearOutgoingCall, incomingCall, clearIncomingCall } =
+    useCallStore();
   const { conversationId, title, avatar, online, userId } =
     useLocalSearchParams<{
       conversationId: string;
@@ -74,15 +73,20 @@ export default function ConversationScreen() {
     setShowReactionPicker(false);
   };
   useEffect(() => {
-    if (!messages.length) return;
+    if (!messages.length || !currentUser?.id) return;
 
     messages.forEach((message) => {
-      if (message.senderId !== currentUser?.id && message.reads.length === 0) {
+      const isMine = message.senderId === currentUser.id;
+
+      const alreadyRead = message.reads.some(
+        (read) => read.userId === currentUser.id,
+      );
+
+      if (!isMine && !alreadyRead) {
         readMutation.mutate(message.id);
       }
     });
   }, [messages, currentUser?.id]);
-
   useEffect(() => {
     requestAnimationFrame(() => {
       flatListRef.current?.scrollToOffset({
@@ -127,8 +131,8 @@ export default function ConversationScreen() {
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-white"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
     >
       <IncomingCallModal
         visible={!!incomingCall}
@@ -141,6 +145,8 @@ export default function ConversationScreen() {
         call={outgoingCall?.call ?? null}
         onClose={clearOutgoingCall}
       />
+
+      {/* Header */}
       <View className="mx-4 mt-20">
         <ChatHeader
           title={title}
@@ -169,6 +175,7 @@ export default function ConversationScreen() {
           }}
         />
       </View>
+
       {selectionCount > 0 && (
         <MessageActionBar
           selectedMessages={selectedMessages}
@@ -188,19 +195,15 @@ export default function ConversationScreen() {
                 deleteMutation.mutateAsync(message.id),
               ),
             );
+            clearSelection();
           }}
-          onForward={() => {
-            // Forward screen later
-          }}
-          // onReaction={() => {
-          //   // Open reaction picker later
-          // }}
+          onForward={() => {}}
         />
       )}
-      {selectionCount == 1 && (
+
+      {selectionCount === 1 && (
         <ReactionPicker
           visible={showReactionPicker}
-          // x={reactionPosition.x}
           y={reactionPosition.y + 120}
           onSelect={(emoji) => {
             if (!selectedMessage) return;
@@ -209,53 +212,54 @@ export default function ConversationScreen() {
               messageId: selectedMessage.id,
               emoji,
             });
+
             setShowReactionPicker(false);
             clearSelection();
           }}
         />
       )}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(message) => message.id}
-        contentContainerStyle={{
-          padding: 16,
-          flexGrow: 1,
-        }}
-        onScrollBeginDrag={() => {
-          setShowReactionPicker(false);
-        }}
-        ListEmptyComponent={() => (
-          <View className="flex-1 items-center justify-center">
-            <Text className="text-gray-500">No messages yet.</Text>
-          </View>
-        )}
-        inverted
-        renderItem={({ item }) => (
-          <MessageBubble
-            message={item}
-            isMine={item.senderId === currentUser?.id}
-            selected={selectedMessages.some((m) => m.id === item.id)}
-            selectionMode={selectionCount > 0}
-            onSelect={() => toggleMessageSelection(item)}
-            onShowReactionPicker={(message, position) => {
-              setSelectedMessages([message]);
-              setReactionPosition(position);
-              setShowReactionPicker(true);
-            }}
-            // onReply={() => {
-            //   if (selectedMessages.length === 0) {
-            //     setReplyTo(item);
-            //   }
-            // }}
-            // onClose={() => {
-            //   setShowReactionPicker(false);
-            //   clearSelection();
-            // }}
-          />
-        )}
-      />
-      <View className=" mb-12 mx-4">
+
+      {/* Messages */}
+      <View className="flex-1">
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(message) => message.id}
+          inverted
+          className="flex-1"
+          contentContainerStyle={{
+            padding: 16,
+            flexGrow: 1,
+          }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          onScrollBeginDrag={() => {
+            setShowReactionPicker(false);
+          }}
+          ListEmptyComponent={() => (
+            <View className="flex-1 items-center justify-center">
+              <Text className="text-gray-500">No messages yet.</Text>
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <MessageBubble
+              message={item}
+              isMine={item.senderId === currentUser?.id}
+              selected={selectedMessages.some((m) => m.id === item.id)}
+              selectionMode={selectionCount > 0}
+              onSelect={() => toggleMessageSelection(item)}
+              onShowReactionPicker={(message, position) => {
+                setSelectedMessages([message]);
+                setReactionPosition(position);
+                setShowReactionPicker(true);
+              }}
+            />
+          )}
+        />
+      </View>
+
+      {/* Message input */}
+      <View className={`mx-4 ${Platform.OS === "android" ? "mb-16" : "mb-2"}`}>
         <MessageInput
           conversationId={conversationId}
           replyTo={replyTo}
