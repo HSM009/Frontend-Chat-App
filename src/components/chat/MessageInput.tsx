@@ -121,7 +121,7 @@ export default function MessageInput({
     }
   }, [editingMessage]);
   return (
-    <View className="border-t border-gray-300 bg-white px-3 py-2">
+    <View className="bg-white px-3 py-2">
       {editingMessage && (
         <View className="mb-3 rounded-xl border-l-4 border-blue-500 bg-blue-50 px-3 py-2">
           <View className="flex-row items-center justify-between">
@@ -139,6 +139,7 @@ export default function MessageInput({
           </View>
         </View>
       )}
+
       {replyTo && !editingMessage && (
         <View className="mb-3 flex-row items-center rounded-xl border-l-4 border-yellow-500 bg-gray-100 px-3 py-2">
           <View className="flex-1">
@@ -168,6 +169,11 @@ export default function MessageInput({
           value={text}
           onChangeText={handleTyping}
           multiline
+          textAlignVertical="center"
+          showSoftInputOnFocus={true}
+          onFocus={() => {
+            console.log("INPUT FOCUSED");
+          }}
         />
 
         <Pressable
@@ -176,7 +182,7 @@ export default function MessageInput({
             editingMessage ? "px-5" : "w-12"
           }`}
         >
-          <Text className="text-4xl text-center font-bold text-white">
+          <Text className="text-center text-3xl font-bold text-white">
             {editingMessage ? "✓" : "➤"}
           </Text>
         </Pressable>

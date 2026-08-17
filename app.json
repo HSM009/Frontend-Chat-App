@@ -19,7 +19,6 @@
     },
     "android": {
       "package": "com.hsm.chatapp",
-
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
         "android.permission.CAMERA",
